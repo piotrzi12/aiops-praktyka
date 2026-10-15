@@ -123,11 +123,21 @@ jobs:
         run: aws eks update-kubeconfig --name aiops --region eu-central-1
       - name: Helm upgrade
         run: |
+          # Lista CIDR w Ingressie bywa zmieniana poza Helmem (kubectl-annotate).
+          # Przekazujemy aktualną wartość z klastra, żeby SSA nie zgłosiło konfliktu
+          # i żeby nie zawęzić dostępu do aplikacji.
+          cidrs="$(kubectl get ingress kantyna-web -n "$K8S_NAMESPACE" \
+            -o 'jsonpath={.metadata.annotations.alb\.ingress\.kubernetes\.io/inbound-cidrs}' || true)"
+          extra=()
+          if [ -n "$cidrs" ]; then
+            extra+=(--set-string "ingress.annotations.alb\.ingress\.kubernetes\.io/inbound-cidrs=${cidrs//,/\\,}")
+          fi
           helm upgrade kantyna app/deploy/helm/kantyna \
             --namespace "$K8S_NAMESPACE" \
             --reuse-values \
             --set global.imageRegistry="$ECR_REGISTRY" \
             --set global.imageTag="$IMAGE_TAG" \
+            "${extra[@]}" \
             --wait --timeout 5m
       - name: Rollout status
         run: |
