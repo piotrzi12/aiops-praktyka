@@ -1,0 +1,8 @@
+Jesteś SRE. Środowisko: EKS 1.36, namespace kantyna, orders-api 1.0.0, postgres:17-alpine.
+Objaw: od ok. 07:10 502 na /api/menu i /api/orders; wczoraj o 18:00 wymieniono node group.
+Dane: przeczytaj lab01b/awaria-zred.txt (get pods, logs --previous, describe, get pvc, get nodes).
+Już sprawdziłem: Ingress i Service web działają, błąd dopiero przy wywołaniu orders-api.
+Zadanie: podaj 3 najbardziej prawdopodobne hipotezy, od najbardziej prawdopodobnej.
+Ograniczenia: proponuj tylko komendy read-only. Nie proponuj jeszcze poprawki.
+Jeśli brakuje danych, napisz, jakiej komendy potrzebujesz, zamiast zgadywać.
+Format: tabela | hipoteza | dowód z danych powyżej | komenda weryfikująca |.
