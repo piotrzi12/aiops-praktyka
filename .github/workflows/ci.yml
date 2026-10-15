@@ -147,6 +147,6 @@ jobs:
       - name: Smoke test /healthz
         run: |
           kubectl exec -n "$K8S_NAMESPACE" deploy/kantyna-web -- \
-            wget -qO- http://localhost:8080/healthz
+            wget -qO- http://127.0.0.1:8080/healthz
           kubectl exec -n "$K8S_NAMESPACE" deploy/kantyna-web -- \
             wget -qO- http://kantyna-payments:8080/healthz
