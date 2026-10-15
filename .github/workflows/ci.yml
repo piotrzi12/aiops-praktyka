@@ -1,0 +1,142 @@
+name: ci
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "app/**"
+      - ".github/workflows/ci.yml"
+  pull_request:
+    paths:
+      - "app/**"
+      - ".github/workflows/ci.yml"
+
+permissions: {}
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  test-orders-api:
+    name: Testy orders-api
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    defaults:
+      run:
+        working-directory: app/orders-api
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884 # v10.3.0
+        with:
+          python-version: "3.12"
+          enable-cache: true
+          cache-dependency-glob: app/orders-api/uv.lock
+      - run: uv run pytest -q
+
+  test-payments:
+    name: Testy payments
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    defaults:
+      run:
+        working-directory: app/payments
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: app/payments/go.mod
+          cache-dependency-path: app/payments/go.sum
+      - run: go test ./...
+
+  build:
+    name: Build i push do ECR
+    if: github.event_name == 'push'
+    needs: [test-orders-api, test-payments]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    permissions:
+      contents: read
+      id-token: write # OIDC do AWS (bez kluczy)
+    strategy:
+      fail-fast: true
+      matrix:
+        service: [orders-api, payments, worker, web]
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: aws-actions/configure-aws-credentials@e1253824e5c10ff9df46874f81ed3ec929e19cfd # v6.3.0
+        with:
+          role-to-assume: ${{ vars.AWS_ROLE_ARN }}
+          aws-region: eu-central-1
+      - uses: aws-actions/amazon-ecr-login@03f1aad4c6c7ffd436567f42f9384779290529bd # v2.1.7
+      - uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
+      - uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
+        with:
+          context: app/${{ matrix.service }}
+          platforms: linux/amd64
+          push: true
+          tags: ${{ vars.ECR_REGISTRY }}/kantyna/${{ matrix.service }}:${{ github.sha }}
+          build-args: |
+            APP_VERSION=${{ github.sha }}
+            APP_VARIANT=stable
+          cache-from: type=gha,scope=${{ matrix.service }}
+          cache-to: type=gha,mode=max,scope=${{ matrix.service }}
+
+  deploy:
+    name: Wdrożenie na klaster
+    if: github.event_name == 'push'
+    needs: [build]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    permissions:
+      contents: read
+      id-token: write # OIDC do AWS (bez kluczy)
+    concurrency:
+      group: deploy-${{ vars.K8S_NAMESPACE }}
+      cancel-in-progress: false
+    env:
+      ECR_REGISTRY: ${{ vars.ECR_REGISTRY }}
+      K8S_NAMESPACE: ${{ vars.K8S_NAMESPACE }}
+      IMAGE_TAG: ${{ github.sha }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: aws-actions/configure-aws-credentials@e1253824e5c10ff9df46874f81ed3ec929e19cfd # v6.3.0
+        with:
+          role-to-assume: ${{ vars.AWS_ROLE_ARN }}
+          aws-region: eu-central-1
+      - uses: azure/setup-helm@9bc31f4ebc9c6b171d7bfbaa5d006ae7abdb4310 # v5.0.1
+        with:
+          version: v4.3.0
+      - name: Konfiguracja kubeconfig
+        run: aws eks update-kubeconfig --name aiops --region eu-central-1
+      - name: Helm upgrade
+        run: |
+          helm upgrade kantyna app/deploy/helm/kantyna \
+            --namespace "$K8S_NAMESPACE" \
+            --reuse-values \
+            --set global.imageRegistry="$ECR_REGISTRY" \
+            --set global.imageTag="$IMAGE_TAG" \
+            --wait --timeout 5m
+      - name: Rollout status
+        run: |
+          for d in web orders-api payments worker; do
+            kubectl rollout status "deploy/kantyna-$d" -n "$K8S_NAMESPACE" --timeout=180s
+          done
+      - name: Smoke test /healthz
+        run: |
+          kubectl exec -n "$K8S_NAMESPACE" deploy/kantyna-web -- \
+            wget -qO- http://localhost:8080/healthz
+          kubectl exec -n "$K8S_NAMESPACE" deploy/kantyna-web -- \
+            wget -qO- http://kantyna-payments:8080/healthz
