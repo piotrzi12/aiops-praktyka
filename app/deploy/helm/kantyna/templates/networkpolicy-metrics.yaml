@@ -1,0 +1,25 @@
+{{- if and .Values.metrics.serviceMonitor.enabled .Values.ordersApi.enabled }}
+# Prometheus (namespace monitoring) musi móc zbierać /metrics z orders-api.
+# Inne NetworkPolicy dla orders-api (web, loadgen) nie dopuszczały monitoringu,
+# przez co target miał up=0, a alerty i dashboard nie widziały metryk.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: {{ include "kantyna.componentName" (dict "ctx" $ "component" "orders-api") }}-metrics
+  labels:
+    {{- include "kantyna.labels" (dict "ctx" $ "component" "orders-api") | nindent 4 }}
+spec:
+  podSelector:
+    matchLabels:
+      {{- include "kantyna.selectorLabels" (dict "ctx" $ "component" "orders-api") | nindent 6 }}
+  policyTypes:
+    - Ingress
+  ingress:
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: monitoring
+      ports:
+        - protocol: TCP
+          port: 8000
+{{- end }}
