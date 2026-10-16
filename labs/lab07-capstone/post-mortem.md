@@ -64,12 +64,14 @@ Menu i składanie zamówień przez web nie działały: oba pody `orders-api` by�
 
 | # | Akcja | Właściciel | Termin |
 |---|---|---|---|
-| 1 | Włączyć `prometheusRule.enabled` w release `piotr-z` i sprawdzić, czy `KantynaDBPoolExhausted` i `KantynaHighLatencyP95` wyzwalają się na tym środowisku | [do uzupełnienia] | [do uzupełnienia] |
-| 2 | Dodać alert na target down (`up{job="kantyna-orders-api"} == 0`) z runbookiem `app/runbooks/<AlertName>.md` (reguły i runbooki idą parami) | [do uzupełnienia] | [do uzupełnienia] |
-| 3 | Przenieść NetworkPolicy z lab02/lab04/lab07 do chartu, żeby żadna polityka nie istniała tylko po `kubectl apply` | [do uzupełnienia] | [do uzupełnienia] |
-| 4 | Do runbooka `KantynaDBPoolExhausted` dopisać: po wyłączeniu przyczyny wycieku trzeba zrestartować pody (wniosek z tego incydentu; treść runbooka nie była czytana) | [do uzupełnienia] | [do uzupełnienia] |
-| 5 | Zmieniać flagi przez repo/pipeline; do mitygacji ręcznej używać tekstu identycznego z chartem albo `helm upgrade --set`, żeby uniknąć `conflict with "kubectl-patch"` | [do uzupełnienia] | [do uzupełnienia] |
-| 6 | Zmierzyć wpływ `slow_menu_query` przy większym ruchu (k6) i zdecydować, czy jest realnym ryzykiem | [do uzupełnienia] | [do uzupełnienia] |
+| 1 | Włączyć `prometheusRule.enabled` w release `piotr-z` i sprawdzić, czy `KantynaDBPoolExhausted` i `KantynaHighLatencyP95` wyzwalają się na tym środowisku | Piotr Zimak | pn 19.10.2026 |
+| 2 | Dodać alert na target down (`up{job="kantyna-orders-api"} == 0`) z runbookiem `app/runbooks/<AlertName>.md` (reguły i runbooki idą parami) | Piotr Zimak | pt 23.10.2026 |
+| 3 | Przenieść NetworkPolicy z lab02/lab04/lab07 do chartu, żeby żadna polityka nie istniała tylko po `kubectl apply` | Piotr Zimak | pt 23.10.2026 |
+| 4 | Do runbooka `KantynaDBPoolExhausted` dopisać: po wyłączeniu przyczyny wycieku trzeba zrestartować pody (wniosek z tego incydentu; treść runbooka nie była czytana) | Piotr Zimak | pn 19.10.2026 |
+| 5 | Zmieniać flagi przez repo/pipeline; do mitygacji ręcznej używać tekstu identycznego z chartem albo `helm upgrade --set`, żeby uniknąć `conflict with "kubectl-patch"` | Piotr Zimak | pn 19.10.2026 |
+| 6 | Zmierzyć wpływ `slow_menu_query` przy większym ruchu (k6) i zdecydować, czy jest realnym ryzykiem | Piotr Zimak | pt 30.10.2026 |
+
+Właściciel i terminy akcji to **[AI, bez dowodu]**: propozycja AI, bo w materiałach nie ma przypisania odpowiedzialności. Piotr Zimak jest jedyną osobą, która pojawia się w dzienniku, a terminy ułożyłem wg ważności (1, 4, 5 w poniedziałek po incydencie; 2 i 3 do końca następnego tygodnia; 6 później, bo wymaga testu obciążeniowego). Do potwierdzenia lub zmiany przez człowieka.
 
 ## Pytania otwarte
 
